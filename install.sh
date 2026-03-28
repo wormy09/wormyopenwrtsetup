@@ -3,16 +3,20 @@
 # Passwall2 Auto-Setup for OpenWrt 24.10
 # Optimized for 256MB RAM routers (MediaTek mt7622)
 # ============================================
-# Usage: wget -O- https://raw.githubusercontent.com/USER/REPO/main/install.sh | sh
-# Or:    sh install.sh
+# Usage:
+#   wget -O /tmp/install.sh https://raw.githubusercontent.com/wormy09/wormyopenwrtsetup/main/install.sh
+#   sh /tmp/install.sh
+#   sh /tmp/install.sh "https://your-sub-url" "US-NJ" "my vless"
 # ============================================
 
 set -e
 
 # --- Configuration ---
-SUB_URL="https://sub.wormyvpn.com/XesMAGuYyrYTRDuV"
-SUB_REMARK="wormys vless"
-PREFERRED_NODE_KEYWORD="DE-FRA"  # keyword to match preferred node for shunt
+# Override defaults by passing arguments:
+#   sh install.sh "https://your-sub-url" "US-NJ"
+SUB_URL="${1:-https://sub.wormyvpn.com/XesMAGuYyrYTRDuV}"
+SUB_REMARK="${3:-wormys vless}"
+PREFERRED_NODE_KEYWORD="${2:-DE-FRA}"  # keyword to match preferred node for shunt
 
 echo "=========================================="
 echo " Passwall2 Auto-Setup"

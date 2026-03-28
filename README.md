@@ -18,9 +18,21 @@ YouTube, Discord, Instagram, Facebook, Meta/Oculus Quest, WhatsApp, Telegram, Tw
 ## Quick install
 
 ```bash
-wget -O /tmp/install.sh https://raw.githubusercontent.com/USER/REPO/main/install.sh
+wget -O /tmp/install.sh https://raw.githubusercontent.com/wormy09/wormyopenwrtsetup/main/install.sh
 sh /tmp/install.sh
 ```
+
+### Custom subscription URL
+
+```bash
+wget -O /tmp/install.sh https://raw.githubusercontent.com/wormy09/wormyopenwrtsetup/main/install.sh
+sh /tmp/install.sh "https://your-sub-url.com/xyz" "US-NJ" "my vless"
+```
+
+Arguments:
+1. Subscription URL (default: built-in)
+2. Preferred node keyword to match (default: `DE-FRA`)
+3. Subscription display name (default: `wormys vless`)
 
 ## Requirements
 
@@ -31,13 +43,19 @@ sh /tmp/install.sh
 
 ## Configuration
 
-Edit the top of `install.sh` before running:
+Pass arguments to the script to customize:
 
 ```bash
-SUB_URL="https://your-subscription-url"
-SUB_REMARK="my vless"
-PREFERRED_NODE_KEYWORD="DE-FRA"  # keyword to match your preferred server
+sh /tmp/install.sh "SUB_URL" "NODE_KEYWORD" "DISPLAY_NAME"
 ```
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| 1st | built-in URL | Your VLESS subscription URL |
+| 2nd | `DE-FRA` | Keyword to match preferred server |
+| 3rd | `wormys vless` | Display name for subscription |
+
+No arguments = uses built-in defaults.
 
 ## After install
 
