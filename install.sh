@@ -605,7 +605,7 @@ echo "[8/9] Done."
 # --- Step 9: Set up cron and restart ---
 echo "[9/9] Setting up cron and final restart..."
 
-echo '0 5 * * * rm -rf /tmp/bak_v2ray 2>/dev/null; /etc/init.d/passwall2 restart' > /etc/crontabs/root
+echo '0 */6 * * * rm -rf /tmp/bak_v2ray 2>/dev/null; /etc/init.d/passwall2 restart' > /etc/crontabs/root
 /etc/init.d/cron restart
 
 /etc/init.d/passwall2 restart
