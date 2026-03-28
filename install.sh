@@ -18,6 +18,42 @@ SUB_URL="${1:-https://sub.wormyvpn.com/XesMAGuYyrYTRDuV}"
 SUB_REMARK="${3:-wormys vless}"
 PREFERRED_NODE_KEYWORD="${2:-DE-FRA}"  # keyword to match preferred node for shunt
 
+# --- Detect package manager ---
+if command -v apk > /dev/null 2>&1 && apk --version > /dev/null 2>&1; then
+  PKG_MGR="apk"
+  echo "Detected package manager: apk (OpenWrt 24.10+)"
+elif command -v opkg > /dev/null 2>&1; then
+  PKG_MGR="opkg"
+  echo "Detected package manager: opkg"
+else
+  echo "ERROR: No supported package manager found (need opkg or apk)"
+  exit 1
+fi
+
+pkg_install() {
+  if [ "$PKG_MGR" = "apk" ]; then
+    apk add "$@" 2>/dev/null || true
+  else
+    opkg install "$@" 2>/dev/null || true
+  fi
+}
+
+pkg_remove() {
+  if [ "$PKG_MGR" = "apk" ]; then
+    apk del "$@" 2>/dev/null || true
+  else
+    opkg remove --force-removal-of-dependent-packages "$@" 2>/dev/null || true
+  fi
+}
+
+pkg_update() {
+  if [ "$PKG_MGR" = "apk" ]; then
+    apk update
+  else
+    opkg update
+  fi
+}
+
 echo "=========================================="
 echo " Passwall2 Auto-Setup"
 echo "=========================================="
@@ -29,10 +65,8 @@ rm -f /etc/init.d/zapret
 rm -f /etc/hotplug.d/iface/90-zapret
 rm -rf /opt/zapret
 
-opkg remove --force-removal-of-dependent-packages \
-  sing-box podkop luci-app-podkop luci-i18n-podkop-ru \
-  https-dns-proxy luci-app-https-dns-proxy \
-  v2ray-core 2>/dev/null || true
+pkg_remove sing-box podkop luci-app-podkop luci-i18n-podkop-ru \
+  https-dns-proxy luci-app-https-dns-proxy v2ray-core
 rm -f /etc/config/podkop /etc/config/sing-box
 rm -rf /etc/sing-box
 
@@ -53,34 +87,48 @@ echo "[2/9] Done."
 
 # --- Step 3: Install Passwall2 ---
 echo "[3/9] Installing Passwall2..."
-wget -O passwall.pub https://master.dl.sourceforge.net/project/openwrt-passwall-build/passwall.pub
-opkg-key add passwall.pub
-rm -f passwall.pub
 
 read release arch << EOF
 $(. /etc/openwrt_release ; echo ${DISTRIB_RELEASE%.*} $DISTRIB_ARCH)
 EOF
 
-# Check if feeds already added
-if ! grep -q "passwall_packages" /etc/opkg/customfeeds.conf 2>/dev/null; then
-  for feed in passwall_packages passwall2; do
-    echo "src/gz $feed https://master.dl.sourceforge.net/project/openwrt-passwall-build/releases/packages-$release/$arch/$feed" >> /etc/opkg/customfeeds.conf
-  done
+if [ "$PKG_MGR" = "apk" ]; then
+  # APK-based OpenWrt (24.10+ with apk)
+  wget -O /etc/apk/keys/passwall.pub https://master.dl.sourceforge.net/project/openwrt-passwall-build/passwall.pub 2>/dev/null || true
+
+  if ! grep -q "passwall_packages" /etc/apk/repositories.d/passwall.list 2>/dev/null; then
+    for feed in passwall_packages passwall2; do
+      echo "https://master.dl.sourceforge.net/project/openwrt-passwall-build/releases/packages-$release/$arch/$feed" >> /etc/apk/repositories.d/passwall.list
+    done
+  fi
+
+  apk update
+  apk add dnsmasq-full 2>/dev/null || true
+  apk add kmod-nft-socket kmod-nft-tproxy kmod-nft-nat 2>/dev/null || true
+  apk add luci-app-passwall2
+
+else
+  # OPKG-based OpenWrt
+  wget -O passwall.pub https://master.dl.sourceforge.net/project/openwrt-passwall-build/passwall.pub
+  opkg-key add passwall.pub
+  rm -f passwall.pub
+
+  if ! grep -q "passwall_packages" /etc/opkg/customfeeds.conf 2>/dev/null; then
+    for feed in passwall_packages passwall2; do
+      echo "src/gz $feed https://master.dl.sourceforge.net/project/openwrt-passwall-build/releases/packages-$release/$arch/$feed" >> /etc/opkg/customfeeds.conf
+    done
+  fi
+
+  opkg update
+
+  # Replace dnsmasq with dnsmasq-full
+  if opkg list-installed | grep -q "^dnsmasq "; then
+    opkg remove dnsmasq
+  fi
+  opkg install dnsmasq-full 2>/dev/null || true
+  opkg install kmod-nft-socket kmod-nft-tproxy kmod-nft-nat 2>/dev/null || true
+  opkg install luci-app-passwall2
 fi
-
-opkg update
-
-# Install dnsmasq-full (replace dnsmasq)
-if opkg list-installed | grep -q "^dnsmasq "; then
-  opkg remove dnsmasq
-fi
-opkg install dnsmasq-full 2>/dev/null || true
-
-# Install firewall modules
-opkg install kmod-nft-socket kmod-nft-tproxy kmod-nft-nat 2>/dev/null || true
-
-# Install Passwall2
-opkg install luci-app-passwall2
 
 echo "[3/9] Done."
 

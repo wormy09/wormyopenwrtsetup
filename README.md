@@ -36,9 +36,8 @@ Arguments:
 
 ## Requirements
 
-- OpenWrt 24.10.x
-- aarch64_cortex-a53 (or similar)
-- opkg package manager
+- OpenWrt 23.05+ or 24.10+
+- Supports both **opkg** and **apk** package managers (auto-detected)
 - A working VLESS subscription URL
 
 ## Configuration
