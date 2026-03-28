@@ -30,13 +30,16 @@ rm -f /etc/hotplug.d/iface/90-zapret
 rm -rf /opt/zapret
 
 opkg remove --force-removal-of-dependent-packages \
-  sing-box podkop luci-app-podkop luci-i18n-podkop-ru 2>/dev/null || true
+  sing-box podkop luci-app-podkop luci-i18n-podkop-ru \
+  https-dns-proxy luci-app-https-dns-proxy \
+  v2ray-core 2>/dev/null || true
 rm -f /etc/config/podkop /etc/config/sing-box
 rm -rf /etc/sing-box
 
-# Remove stale DNS forwarders (from DNS-over-HTTPS setups)
-uci del_list dhcp.@dnsmasq[0].server='127.0.0.1#5053' 2>/dev/null || true
-uci del_list dhcp.@dnsmasq[0].server='127.0.0.1#5054' 2>/dev/null || true
+# Remove stale DNS forwarders (from DNS-over-HTTPS or other setups)
+for port in 5053 5054 5055 5153 5253; do
+  uci del_list dhcp.@dnsmasq[0].server="127.0.0.1#$port" 2>/dev/null || true
+done
 uci commit dhcp 2>/dev/null || true
 
 echo "[1/9] Done."
