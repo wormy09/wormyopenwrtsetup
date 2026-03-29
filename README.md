@@ -1,6 +1,6 @@
 # Passwall2 Auto-Setup for OpenWrt
 
-One-command Passwall2 setup for OpenWrt routers in Russia. Optimized for 256MB RAM devices (MediaTek mt7622 / aarch64).
+One-command Passwall2 setup for OpenWrt routers in Russia. Optimized for routers with 256MB+ RAM.
 
 ## What it does
 
@@ -9,7 +9,7 @@ One-command Passwall2 setup for OpenWrt routers in Russia. Optimized for 256MB R
 - Configures split routing: blocked domains → VLESS proxy, everything else → direct
 - Sets up subscription auto-update (every 12h)
 - Applies memory optimizations for 256MB routers (no geosite/geoip files)
-- Daily cron cleanup to prevent OOM crashes
+- Cron restart every 6h to prevent xray memory leak OOM crashes
 
 ## Proxied services
 
@@ -22,39 +22,21 @@ wget -O /tmp/install.sh https://raw.githubusercontent.com/wormy09/wormyopenwrtse
 sh /tmp/install.sh
 ```
 
-### Custom subscription URL
+The script will:
+1. Ask for your VLESS subscription URL
+2. Install Passwall2 and dependencies
+3. Fetch your nodes from the subscription
+4. Show a numbered list of available servers
+5. Let you pick which one to use for proxying blocked sites
+6. Configure everything automatically
 
-```bash
-wget -O /tmp/install.sh https://raw.githubusercontent.com/wormy09/wormyopenwrtsetup/main/install.sh
-sh /tmp/install.sh "https://your-sub-url.com/xyz" "US-NJ" "my vless"
-```
-
-Arguments:
-1. Subscription URL (default: built-in)
-2. Preferred node keyword to match (default: `DE-FRA`)
-3. Subscription display name (default: `wormys vless`)
+No hardcoded credentials — safe to share publicly.
 
 ## Requirements
 
 - OpenWrt 23.05+ or 24.10+
 - Supports both **opkg** and **apk** package managers (auto-detected)
 - A working VLESS subscription URL
-
-## Configuration
-
-Pass arguments to the script to customize:
-
-```bash
-sh /tmp/install.sh "SUB_URL" "NODE_KEYWORD" "DISPLAY_NAME"
-```
-
-| Argument | Default | Description |
-|----------|---------|-------------|
-| 1st | built-in URL | Your VLESS subscription URL |
-| 2nd | `DE-FRA` | Keyword to match preferred server |
-| 3rd | `wormys vless` | Display name for subscription |
-
-No arguments = uses built-in defaults.
 
 ## After install
 
@@ -89,12 +71,6 @@ rm -f /usr/share/v2ray/geosite.dat /usr/share/v2ray/geoip.dat
 rm -rf /tmp/bak_v2ray
 /etc/init.d/passwall2 restart
 ```
-
-### Node not found automatically
-If the script can't match your preferred node, configure manually:
-1. Go to **Node List**, note which server you want
-2. Create an **Xray-Shunt** node: Russia_Block → your server, Default → Direct Connection
-3. Set **TCP Node** to the shunt node
 
 ## Memory notes (256MB routers)
 

@@ -1,42 +1,24 @@
 #!/bin/sh
 # ============================================
-# Passwall2 Auto-Setup for OpenWrt 24.10
-# Optimized for 256MB RAM routers (MediaTek mt7622)
+# Passwall2 Auto-Setup for OpenWrt
+# Optimized for 256MB+ RAM routers
 # ============================================
 # Usage:
 #   wget -O /tmp/install.sh https://raw.githubusercontent.com/wormy09/wormyopenwrtsetup/main/install.sh
 #   sh /tmp/install.sh
-#   sh /tmp/install.sh "https://your-sub-url" "US-NJ" "my vless"
 # ============================================
 
 set -e
 
-# --- Configuration ---
-# Override defaults by passing arguments:
-#   sh install.sh "https://your-sub-url" "US-NJ"
-SUB_URL="${1:-https://sub.wormyvpn.com/XesMAGuYyrYTRDuV}"
-SUB_REMARK="${3:-wormys vless}"
-PREFERRED_NODE_KEYWORD="${2:-DE-FRA}"  # keyword to match preferred node for shunt
-
 # --- Detect package manager ---
 if command -v apk > /dev/null 2>&1 && apk --version > /dev/null 2>&1; then
   PKG_MGR="apk"
-  echo "Detected package manager: apk (OpenWrt 24.10+)"
 elif command -v opkg > /dev/null 2>&1; then
   PKG_MGR="opkg"
-  echo "Detected package manager: opkg"
 else
   echo "ERROR: No supported package manager found (need opkg or apk)"
   exit 1
 fi
-
-pkg_install() {
-  if [ "$PKG_MGR" = "apk" ]; then
-    apk add "$@" 2>/dev/null || true
-  else
-    opkg install "$@" 2>/dev/null || true
-  fi
-}
 
 pkg_remove() {
   if [ "$PKG_MGR" = "apk" ]; then
@@ -46,20 +28,30 @@ pkg_remove() {
   fi
 }
 
-pkg_update() {
-  if [ "$PKG_MGR" = "apk" ]; then
-    apk update
-  else
-    opkg update
-  fi
-}
+echo ""
+echo "=========================================="
+echo "  Passwall2 Auto-Setup for OpenWrt"
+echo "=========================================="
+echo "  Package manager: $PKG_MGR"
+echo "=========================================="
+echo ""
 
-echo "=========================================="
-echo " Passwall2 Auto-Setup"
-echo "=========================================="
+# --- Ask for subscription URL ---
+printf "Enter your VLESS subscription URL: "
+read SUB_URL
+
+if [ -z "$SUB_URL" ]; then
+  echo "ERROR: Subscription URL is required."
+  exit 1
+fi
+
+printf "Enter a name for this subscription (default: my-vless): "
+read SUB_REMARK
+SUB_REMARK="${SUB_REMARK:-my-vless}"
 
 # --- Step 1: Remove conflicting software ---
-echo "[1/9] Removing conflicting software..."
+echo ""
+echo "[1/8] Removing conflicting software..."
 /etc/init.d/zapret stop 2>/dev/null || true
 rm -f /etc/init.d/zapret
 rm -f /etc/hotplug.d/iface/90-zapret
@@ -67,33 +59,32 @@ rm -rf /opt/zapret
 
 pkg_remove sing-box podkop luci-app-podkop luci-i18n-podkop-ru \
   https-dns-proxy luci-app-https-dns-proxy v2ray-core
+
 rm -f /etc/config/podkop /etc/config/sing-box
 rm -rf /etc/sing-box
 
-# Remove stale DNS forwarders (from DNS-over-HTTPS or other setups)
 for port in 5053 5054 5055 5153 5253; do
   uci del_list dhcp.@dnsmasq[0].server="127.0.0.1#$port" 2>/dev/null || true
 done
 uci commit dhcp 2>/dev/null || true
 
-echo "[1/9] Done."
+echo "[1/8] Done."
 
 # --- Step 2: Disable flow offloading ---
-echo "[2/9] Disabling flow offloading..."
+echo "[2/8] Disabling flow offloading..."
 uci set firewall.@defaults[0].flow_offloading='0'
 uci set firewall.@defaults[0].flow_offloading_hw='0'
 uci commit firewall
-echo "[2/9] Done."
+echo "[2/8] Done."
 
 # --- Step 3: Install Passwall2 ---
-echo "[3/9] Installing Passwall2..."
+echo "[3/8] Installing Passwall2..."
 
 read release arch << EOF
 $(. /etc/openwrt_release ; echo ${DISTRIB_RELEASE%.*} $DISTRIB_ARCH)
 EOF
 
 if [ "$PKG_MGR" = "apk" ]; then
-  # APK-based OpenWrt (24.10+ with apk)
   wget -O /etc/apk/keys/passwall.pub https://master.dl.sourceforge.net/project/openwrt-passwall-build/passwall.pub 2>/dev/null || true
 
   if ! grep -q "passwall_packages" /etc/apk/repositories.d/passwall.list 2>/dev/null; then
@@ -106,9 +97,7 @@ if [ "$PKG_MGR" = "apk" ]; then
   apk add dnsmasq-full 2>/dev/null || true
   apk add kmod-nft-socket kmod-nft-tproxy kmod-nft-nat 2>/dev/null || true
   apk add luci-app-passwall2
-
 else
-  # OPKG-based OpenWrt
   wget -O passwall.pub https://master.dl.sourceforge.net/project/openwrt-passwall-build/passwall.pub
   opkg-key add passwall.pub
   rm -f passwall.pub
@@ -121,7 +110,6 @@ else
 
   opkg update
 
-  # Replace dnsmasq with dnsmasq-full
   if opkg list-installed | grep -q "^dnsmasq "; then
     opkg remove dnsmasq
   fi
@@ -130,21 +118,15 @@ else
   opkg install luci-app-passwall2
 fi
 
-echo "[3/9] Done."
+echo "[3/8] Done."
 
-# --- Step 4: Remove geo files ---
-echo "[4/9] Removing geo files (prevents OOM on 256MB routers)..."
-rm -f /usr/share/xray/geosite.dat
-rm -f /usr/share/xray/geoip.dat
-rm -f /usr/share/v2ray/geosite.dat
-rm -f /usr/share/v2ray/geoip.dat
+# --- Step 4: Remove geo files & apply config ---
+echo "[4/8] Removing geo files and applying configuration..."
+rm -f /usr/share/xray/geosite.dat /usr/share/xray/geoip.dat
+rm -f /usr/share/v2ray/geosite.dat /usr/share/v2ray/geoip.dat
 rm -rf /tmp/bak_v2ray
-echo "[4/9] Done."
 
-# --- Step 5: Apply Passwall2 configuration ---
-echo "[5/9] Applying Passwall2 configuration..."
-
-# Domain list for Russia_Block rule
+# Domain list
 DOMAIN_LIST='domain:youtube.com
 domain:youtu.be
 domain:youtube-nocookie.com
@@ -442,7 +424,6 @@ domain:9cache.com
 domain:pornolab.net
 domain:rutracker.org'
 
-# IP list for Russia_Block rule (Telegram ranges)
 IP_LIST='149.154.160.0/20
 91.108.4.0/22
 91.108.8.0/22
@@ -452,25 +433,21 @@ IP_LIST='149.154.160.0/20
 91.108.56.0/22
 95.161.64.0/20'
 
-# Write Russia_Block shunt rule
+# Apply shunt rules
 uci set passwall2.Russia_Block=shunt_rules
 uci set passwall2.Russia_Block.remarks='Russia_Block'
 uci set passwall2.Russia_Block.network='tcp,udp'
 uci set passwall2.Russia_Block.domain_list="$DOMAIN_LIST"
 uci set passwall2.Russia_Block.ip_list="$IP_LIST"
 
-# Disable unused shunt rules (China, Iran, Russia reference geo files we don't have)
-uci set passwall2.China=shunt_rules
-uci set passwall2.China.remarks='China'
-uci set passwall2.China.network='tcp,udp'
-uci set passwall2.China.domain_list=''
-uci set passwall2.China.ip_list=''
-
-uci set passwall2.Iran=shunt_rules
-uci set passwall2.Iran.remarks='Iran'
-uci set passwall2.Iran.network='tcp,udp'
-uci set passwall2.Iran.domain_list=''
-uci set passwall2.Iran.ip_list=''
+# Clear unused rules
+for rule in China Iran; do
+  uci set passwall2.$rule=shunt_rules
+  uci set passwall2.$rule.remarks="$rule"
+  uci set passwall2.$rule.network='tcp,udp'
+  uci set passwall2.$rule.domain_list=''
+  uci set passwall2.$rule.ip_list=''
+done
 
 # Global settings
 uci set passwall2.@global[0].enabled='1'
@@ -481,7 +458,7 @@ uci set passwall2.@global[0].acl_enable='0'
 uci set passwall2.@global[0].loglevel='none'
 uci set passwall2.@global[0].log_node='0'
 
-# DNS settings
+# DNS
 uci set passwall2.@global[0].direct_dns_protocol='auto'
 uci set passwall2.@global[0].direct_dns_query_strategy='UseIP'
 uci set passwall2.@global[0].remote_dns_protocol='tcp'
@@ -491,7 +468,7 @@ uci set passwall2.@global[0].remote_dns_detour='remote'
 uci set passwall2.@global[0].dns_redirect='1'
 uci set passwall2.@global[0].dns_hosts='dns.google.com 8.8.8.8'
 
-# Forwarding settings
+# Forwarding
 uci set passwall2.@global_forwarding[0].tcp_no_redir_ports='disable'
 uci set passwall2.@global_forwarding[0].udp_no_redir_ports='disable'
 uci set passwall2.@global_forwarding[0].tcp_redir_ports='1:65535'
@@ -499,23 +476,19 @@ uci set passwall2.@global_forwarding[0].udp_redir_ports='1:65535'
 uci set passwall2.@global_forwarding[0].tcp_proxy_way='redirect'
 uci set passwall2.@global_forwarding[0].ipv6_tproxy='0'
 
-# Disable ALL auto-updates for geo files
+# Disable geo auto-updates
 uci set passwall2.@global_rules[0].auto_update='0'
 uci set passwall2.@global_rules[0].geosite_update='0'
 uci set passwall2.@global_rules[0].geoip_update='0'
 
-# Commit base config
 uci commit passwall2
+echo "[4/8] Done."
 
-echo "[5/9] Done."
+# --- Step 5: Set up subscription and fetch nodes ---
+echo "[5/8] Setting up subscription..."
 
-# --- Step 6: Set up subscription ---
-echo "[6/9] Setting up subscription..."
-
-# Delete existing subscriptions
 while uci delete passwall2.@subscribe_list[0] 2>/dev/null; do :; done
 
-# Add subscription
 uci add passwall2 subscribe_list
 uci set passwall2.@subscribe_list[0].remark="$SUB_REMARK"
 uci set passwall2.@subscribe_list[0].url="$SUB_URL"
@@ -534,76 +507,95 @@ uci set passwall2.@subscribe_list[0].week_update='8'
 uci set passwall2.@subscribe_list[0].interval_update='12'
 
 uci commit passwall2
+echo "[5/8] Done."
 
-echo "[6/9] Done."
+# --- Step 6: Fetch nodes and let user choose ---
+echo "[6/8] Fetching nodes from subscription..."
 
-# --- Step 7: Trigger subscription update and configure shunt ---
-echo "[7/9] Updating subscription and configuring shunt node..."
-
-# Restart to trigger subscription update (boot_update=1)
 /etc/init.d/passwall2 stop 2>/dev/null || true
 sleep 2
 /etc/init.d/passwall2 start
-sleep 10
 
-# Find the preferred node ID (match by keyword in remarks)
-PREFERRED_NODE=""
-for node_id in $(uci show passwall2 | grep "\.remarks=" | grep "$PREFERRED_NODE_KEYWORD" | head -1 | cut -d. -f2); do
-  # Make sure it's actually a VLESS node, not a shunt
-  proto=$(uci get passwall2.$node_id.protocol 2>/dev/null)
-  if [ "$proto" = "vless" ]; then
-    PREFERRED_NODE="$node_id"
-    break
-  fi
+echo "  Waiting for subscription update..."
+sleep 15
+
+# Collect proxy nodes (skip shunt, socks, example nodes)
+NODE_IDS=""
+NODE_COUNT=0
+
+for line in $(uci show passwall2 | grep "\.protocol=" | grep -v "_shunt" | grep -v "socks"); do
+  node_id=$(echo "$line" | cut -d. -f2)
+  proto=$(echo "$line" | cut -d\' -f2)
+  remarks=$(uci get passwall2.$node_id.remarks 2>/dev/null)
+
+  # Skip example/placeholder nodes
+  case "$remarks" in
+    Example|example|rulenode|auto-shunt) continue ;;
+  esac
+
+  # Skip nodes without an address
+  addr=$(uci get passwall2.$node_id.address 2>/dev/null)
+  [ -z "$addr" ] && continue
+
+  NODE_COUNT=$((NODE_COUNT + 1))
+  NODE_IDS="$NODE_IDS $node_id"
+  echo "  $NODE_COUNT) $remarks  [$proto, $addr]"
 done
 
-if [ -z "$PREFERRED_NODE" ]; then
-  echo "WARNING: Could not find node matching '$PREFERRED_NODE_KEYWORD'"
-  echo "Available nodes:"
-  uci show passwall2 | grep "\.remarks=" | grep -v "shunt_rules"
+if [ "$NODE_COUNT" -eq 0 ]; then
   echo ""
-  echo "After install, manually:"
-  echo "  1. Go to Node List, note the ID of your preferred node"
-  echo "  2. Create an Xray-Shunt node with Russia_Block pointing to it"
-  echo "  3. Set tcp_node to the shunt node"
-  echo ""
-  echo "Or re-run this script after subscription updates."
-else
-  echo "Found preferred node: $PREFERRED_NODE ($(uci get passwall2.$PREFERRED_NODE.remarks))"
-
-  # Create shunt node
-  uci set passwall2.myshunt=nodes
-  uci set passwall2.myshunt.type='Xray'
-  uci set passwall2.myshunt.protocol='_shunt'
-  uci set passwall2.myshunt.remarks='auto-shunt'
-  uci set passwall2.myshunt.domainStrategy='AsIs'
-  uci set passwall2.myshunt.domainMatcher='hybrid'
-  uci set passwall2.myshunt.write_ipset_direct='1'
-  uci set passwall2.myshunt.enable_geoview_ip='1'
-  uci set passwall2.myshunt.Russia_Block="$PREFERRED_NODE"
-  uci set passwall2.myshunt.default_node='_direct'
-
-  # Set shunt as main node
-  uci set passwall2.@global[0].tcp_node='myshunt'
-  uci set passwall2.@global[0].node='myshunt'
-
-  uci commit passwall2
-  echo "Shunt configured: Russia_Block -> $PREFERRED_NODE, Default -> direct"
+  echo "ERROR: No nodes found. Check your subscription URL."
+  echo "You can configure manually in LuCI: Services -> PassWall2"
+  exit 1
 fi
 
-echo "[7/9] Done."
+echo ""
+printf "Select node for proxying blocked sites (1-$NODE_COUNT): "
+read NODE_CHOICE
 
-# --- Step 8: Clean up and free memory ---
-echo "[8/9] Cleaning up..."
+# Validate input
+if ! echo "$NODE_CHOICE" | grep -qE '^[0-9]+$' || [ "$NODE_CHOICE" -lt 1 ] || [ "$NODE_CHOICE" -gt "$NODE_COUNT" ]; then
+  echo "Invalid choice. Defaulting to 1."
+  NODE_CHOICE=1
+fi
+
+# Get selected node ID
+SELECTED_NODE=$(echo $NODE_IDS | awk "{print \$$NODE_CHOICE}")
+SELECTED_NAME=$(uci get passwall2.$SELECTED_NODE.remarks 2>/dev/null)
+
+echo ""
+echo "  Selected: $SELECTED_NAME"
+echo "[6/8] Done."
+
+# --- Step 7: Create shunt and enable ---
+echo "[7/8] Creating shunt node..."
+
+uci set passwall2.myshunt=nodes
+uci set passwall2.myshunt.type='Xray'
+uci set passwall2.myshunt.protocol='_shunt'
+uci set passwall2.myshunt.remarks='auto-shunt'
+uci set passwall2.myshunt.domainStrategy='AsIs'
+uci set passwall2.myshunt.domainMatcher='hybrid'
+uci set passwall2.myshunt.write_ipset_direct='1'
+uci set passwall2.myshunt.enable_geoview_ip='1'
+uci set passwall2.myshunt.Russia_Block="$SELECTED_NODE"
+uci set passwall2.myshunt.default_node='_direct'
+
+uci set passwall2.@global[0].tcp_node='myshunt'
+uci set passwall2.@global[0].node='myshunt'
+
+uci commit passwall2
+
+echo "  Shunt: Russia_Block -> $SELECTED_NAME"
+echo "  Default -> direct connection"
+echo "[7/8] Done."
+
+# --- Step 8: Cron, cleanup, restart ---
+echo "[8/8] Final cleanup and restart..."
+
 rm -rf /tmp/bak_v2ray
-rm -f /usr/share/xray/geosite.dat
-rm -f /usr/share/xray/geoip.dat
-rm -f /usr/share/v2ray/geosite.dat
-rm -f /usr/share/v2ray/geoip.dat
-echo "[8/9] Done."
-
-# --- Step 9: Set up cron and restart ---
-echo "[9/9] Setting up cron and final restart..."
+rm -f /usr/share/xray/geosite.dat /usr/share/xray/geoip.dat
+rm -f /usr/share/v2ray/geosite.dat /usr/share/v2ray/geoip.dat
 
 echo '0 */6 * * * rm -rf /tmp/bak_v2ray 2>/dev/null; /etc/init.d/passwall2 restart' > /etc/crontabs/root
 /etc/init.d/cron restart
@@ -611,33 +603,29 @@ echo '0 */6 * * * rm -rf /tmp/bak_v2ray 2>/dev/null; /etc/init.d/passwall2 resta
 /etc/init.d/passwall2 restart
 sleep 5
 
-echo "[9/9] Done."
+echo "[8/8] Done."
 
-# --- Final check ---
+# --- Final status ---
 echo ""
 echo "=========================================="
-echo " Setup complete!"
+echo "  Setup complete!"
 echo "=========================================="
 
 if pidof xray > /dev/null 2>&1; then
-  echo " ✓ Xray is running"
+  echo "  Status:  Xray is RUNNING"
 else
-  echo " ✗ Xray is NOT running — check logs:"
-  echo "   cat /tmp/etc/passwall2/acl/default/*.log"
+  echo "  Status:  Xray is NOT running"
+  echo "  Debug:   cat /tmp/etc/passwall2/acl/default/*.log"
 fi
 
+echo "  Memory:  $(awk '/MemAvailable/ {print int($2/1024) "MB available"}' /proc/meminfo)"
+echo "  Disk:    $(df -h /overlay | tail -1 | awk '{print $4 " free"}')"
 echo ""
-echo " Memory: $(awk '/MemAvailable/ {print int($2/1024) "MB available"}' /proc/meminfo)"
-echo " Disk:   $(df -h /overlay | tail -1 | awk '{print $4 " free"}')"
+echo "  Test from a device on the network:"
+echo "    ya.ru        -> should load (direct)"
+echo "    youtube.com  -> should load (proxied)"
+echo "    claude.com   -> should load (proxied)"
 echo ""
-echo " Test from a device on the network:"
-echo "   - ya.ru        (should load — direct)"
-echo "   - youtube.com  (should load — proxied)"
-echo "   - claude.com   (should load — proxied)"
-echo ""
-echo " If a node wasn't found automatically, configure manually:"
-echo "   Services → PassWall2 → Node List → create Xray-Shunt"
-echo ""
-echo " To add new blocked domains:"
-echo "   Rule Manage → Russia_Block → add domain:example.com"
+echo "  Add blocked domains:"
+echo "    Services -> PassWall2 -> Rule Manage -> Russia_Block"
 echo "=========================================="
