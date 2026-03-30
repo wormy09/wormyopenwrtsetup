@@ -512,12 +512,28 @@ echo "[5/8] Done."
 # --- Step 6: Fetch nodes and let user choose ---
 echo "[6/8] Fetching nodes from subscription..."
 
+# IMPORTANT: Disable DNS redirect and passwall2 during subscription fetch.
+# Otherwise passwall2 intercepts DNS but has no working proxy yet, breaking all DNS.
 /etc/init.d/passwall2 stop 2>/dev/null || true
 sleep 2
+
+# Temporarily disable passwall2 so it doesn't hijack DNS
+uci set passwall2.@global[0].enabled='0'
+uci set passwall2.@global[0].dns_redirect='0'
+uci commit passwall2
+
+# Start passwall2 in disabled mode just to trigger subscription fetch
 /etc/init.d/passwall2 start
 
 echo "  Waiting for subscription update..."
 sleep 15
+
+# If no nodes yet, try longer wait
+NODE_CHECK=$(uci show passwall2 | grep "\.protocol='vless'" | head -1)
+if [ -z "$NODE_CHECK" ]; then
+  echo "  Still waiting..."
+  sleep 15
+fi
 
 # Collect proxy nodes (skip shunt, socks, example nodes)
 NODE_IDS=""
@@ -583,6 +599,10 @@ uci set passwall2.myshunt.default_node='_direct'
 
 uci set passwall2.@global[0].tcp_node='myshunt'
 uci set passwall2.@global[0].node='myshunt'
+
+# Re-enable passwall2 and DNS redirect (was disabled for subscription fetch)
+uci set passwall2.@global[0].enabled='1'
+uci set passwall2.@global[0].dns_redirect='1'
 
 uci commit passwall2
 
