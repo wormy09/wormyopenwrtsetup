@@ -70,11 +70,17 @@ uci commit dhcp 2>/dev/null || true
 
 echo "[1/8] Done."
 
-# --- Step 2: Disable flow offloading ---
-echo "[2/8] Disabling flow offloading..."
+# --- Step 2: Disable flow offloading and IPv6 on LAN ---
+echo "[2/8] Disabling flow offloading and IPv6 on LAN..."
 uci set firewall.@defaults[0].flow_offloading='0'
 uci set firewall.@defaults[0].flow_offloading_hw='0'
 uci commit firewall
+
+# Disable IPv6 on LAN — prevents clients from bypassing proxy via IPv6
+uci set dhcp.lan.dhcpv6='disabled'
+uci set dhcp.lan.ra='disabled'
+uci commit dhcp
+
 echo "[2/8] Done."
 
 # --- Step 3: Install Passwall2 ---
@@ -431,7 +437,13 @@ IP_LIST='149.154.160.0/20
 91.108.16.0/22
 91.108.20.0/22
 91.108.56.0/22
-95.161.64.0/20'
+95.161.64.0/20
+157.240.0.0/16
+31.13.24.0/21
+31.13.64.0/18
+102.132.96.0/20
+129.134.0.0/16
+185.60.216.0/22'
 
 # Apply shunt rules
 uci set passwall2.Russia_Block=shunt_rules
