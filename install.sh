@@ -512,17 +512,17 @@ echo "[5/8] Done."
 # --- Step 6: Fetch nodes and let user choose ---
 echo "[6/8] Fetching nodes from subscription..."
 
-# IMPORTANT: Disable DNS redirect and passwall2 during subscription fetch.
-# Otherwise passwall2 intercepts DNS but has no working proxy yet, breaking all DNS.
+# IMPORTANT: Enable passwall2 but WITHOUT dns_redirect and WITHOUT a tcp_node.
+# This lets passwall2 run (and fetch subscriptions) without hijacking DNS.
 /etc/init.d/passwall2 stop 2>/dev/null || true
 sleep 2
 
-# Temporarily disable passwall2 so it doesn't hijack DNS
-uci set passwall2.@global[0].enabled='0'
+uci set passwall2.@global[0].enabled='1'
 uci set passwall2.@global[0].dns_redirect='0'
+uci delete passwall2.@global[0].tcp_node 2>/dev/null || true
+uci delete passwall2.@global[0].node 2>/dev/null || true
 uci commit passwall2
 
-# Start passwall2 in disabled mode just to trigger subscription fetch
 /etc/init.d/passwall2 start
 
 echo "  Waiting for subscription update..."
@@ -533,6 +533,15 @@ NODE_CHECK=$(uci show passwall2 | grep "\.protocol='vless'" | head -1)
 if [ -z "$NODE_CHECK" ]; then
   echo "  Still waiting..."
   sleep 15
+fi
+
+# Last resort: if still no nodes, try triggering lua directly
+NODE_CHECK=$(uci show passwall2 | grep "\.protocol='vless'" | head -1)
+if [ -z "$NODE_CHECK" ]; then
+  echo "  Trying direct subscription fetch..."
+  /etc/init.d/passwall2 stop 2>/dev/null || true
+  lua /usr/share/passwall2/subscribe.lua 2>/dev/null || true
+  sleep 5
 fi
 
 # Collect proxy nodes (skip shunt, socks, example nodes)
