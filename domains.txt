@@ -225,6 +225,14 @@ domain:api.telegram.org
 domain:td.telegram.org
 domain:telegram.dog
 domain:tg.dev
+domain:cdn.telegram.org
+domain:cdn1.telegram.org
+domain:cdn2.telegram.org
+domain:cdn3.telegram.org
+domain:cdn4.telegram.org
+domain:cdn5.telegram.org
+domain:static.telegram.org
+domain:assets.telegram.org
 
 # --- Twitter / X ---
 domain:twitter.com

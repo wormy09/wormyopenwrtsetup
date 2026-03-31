@@ -70,16 +70,11 @@ uci commit dhcp 2>/dev/null || true
 
 echo "[1/8] Done."
 
-# --- Step 2: Disable flow offloading and IPv6 on LAN ---
-echo "[2/8] Disabling flow offloading and IPv6 on LAN..."
+# --- Step 2: Disable flow offloading ---
+echo "[2/8] Disabling flow offloading..."
 uci set firewall.@defaults[0].flow_offloading='0'
 uci set firewall.@defaults[0].flow_offloading_hw='0'
 uci commit firewall
-
-# Disable IPv6 on LAN — prevents clients from bypassing proxy via IPv6
-uci set dhcp.lan.dhcpv6='disabled'
-uci set dhcp.lan.ra='disabled'
-uci commit dhcp
 
 echo "[2/8] Done."
 
@@ -334,6 +329,14 @@ domain:api.telegram.org
 domain:td.telegram.org
 domain:telegram.dog
 domain:tg.dev
+domain:cdn.telegram.org
+domain:cdn1.telegram.org
+domain:cdn2.telegram.org
+domain:cdn3.telegram.org
+domain:cdn4.telegram.org
+domain:cdn5.telegram.org
+domain:static.telegram.org
+domain:assets.telegram.org
 domain:twitter.com
 domain:x.com
 domain:twimg.com
