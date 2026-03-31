@@ -484,8 +484,163 @@ uci set passwall2.@global_rules[0].geoip_update='0'
 uci commit passwall2
 echo "[4/8] Done."
 
-# --- Step 5: Set up subscription and fetch nodes ---
-echo "[5/8] Setting up subscription..."
+# --- Step 5: Fetch subscription and let user choose ---
+echo "[5/8] Fetching nodes from subscription..."
+
+# Stop passwall2 to ensure clean DNS
+/etc/init.d/passwall2 stop 2>/dev/null || true
+sleep 2
+
+# Fetch and decode subscription directly (bypass passwall2's unreliable fetcher)
+SUB_RAW=$(curl -sL -A "v2rayN/9.99" "$SUB_URL" | base64 -d 2>/dev/null)
+
+if [ -z "$SUB_RAW" ]; then
+  echo "ERROR: Could not fetch subscription. Check URL and network."
+  exit 1
+fi
+
+# Parse vless:// links and create nodes
+NODE_IDS=""
+NODE_COUNT=0
+NODE_NAMES=""
+
+echo "$SUB_RAW" | while IFS= read -r line; do echo "$line"; done | grep "^vless://" | while IFS= read -r vless_url; do
+  NODE_COUNT=$((NODE_COUNT + 1))
+
+  # Extract fragment (remarks) — everything after #
+  raw_remarks=$(echo "$vless_url" | sed 's/.*#//')
+  remarks=$(printf '%b' "$(echo "$raw_remarks" | sed 's/%\([0-9A-Fa-f][0-9A-Fa-f]\)/\\x\1/g')")
+  # Sanitize remarks for UCI (no apostrophes or special chars)
+  remarks=$(echo "$remarks" | tr "'" "-" | tr '"' '-')
+
+  # Extract uuid@address:port
+  core=$(echo "$vless_url" | sed 's|vless://||' | sed 's|?.*||')
+  uuid=$(echo "$core" | sed 's|@.*||')
+  addr_port=$(echo "$core" | sed 's|.*@||')
+  address=$(echo "$addr_port" | sed 's|:.*||')
+  port=$(echo "$addr_port" | sed 's|.*:||')
+
+  # Extract query parameters
+  params=$(echo "$vless_url" | sed 's|.*?||' | sed 's|#.*||')
+
+  get_param() {
+    echo "$params" | tr '&' '\n' | grep "^$1=" | head -1 | sed "s|^$1=||" | sed 's/%2F/\//g'
+  }
+
+  encryption=$(get_param encryption)
+  transport=$(get_param type)
+  security=$(get_param security)
+  sni=$(get_param sni)
+  fp=$(get_param fp)
+  pbk=$(get_param pbk)
+  sid=$(get_param sid)
+  flow=$(get_param flow)
+  path=$(get_param path)
+  host=$(get_param host)
+  mode=$(get_param mode)
+
+  # Generate unique node ID
+  node_id="node_$(echo "$address$port" | md5sum 2>/dev/null | cut -c1-8 || echo "${NODE_COUNT}")"
+
+  # Create node via UCI
+  uci set passwall2.$node_id=nodes
+  uci set passwall2.$node_id.type='Xray'
+  uci set passwall2.$node_id.protocol='vless'
+  uci set passwall2.$node_id.remarks="$remarks"
+  uci set passwall2.$node_id.address="$address"
+  uci set passwall2.$node_id.port="$port"
+  uci set passwall2.$node_id.uuid="$uuid"
+  uci set passwall2.$node_id.encryption="${encryption:-none}"
+  uci set passwall2.$node_id.tls='1'
+  uci set passwall2.$node_id.tls_allowInsecure='1'
+  uci set passwall2.$node_id.timeout='60'
+  uci set passwall2.$node_id.add_mode='2'
+  uci set passwall2.$node_id.group="$SUB_REMARK"
+
+  # Transport
+  case "$transport" in
+    xhttp)
+      uci set passwall2.$node_id.transport='xhttp'
+      [ -n "$path" ] && uci set passwall2.$node_id.xhttp_path="$path"
+      [ -n "$host" ] && uci set passwall2.$node_id.xhttp_host="$host"
+      [ -n "$mode" ] && uci set passwall2.$node_id.xhttp_mode="$mode"
+      ;;
+    tcp|"")
+      uci set passwall2.$node_id.transport='raw'
+      uci set passwall2.$node_id.tcp_guise='none'
+      ;;
+    ws)
+      uci set passwall2.$node_id.transport='ws'
+      [ -n "$path" ] && uci set passwall2.$node_id.ws_path="$path"
+      [ -n "$host" ] && uci set passwall2.$node_id.ws_host="$host"
+      ;;
+    grpc)
+      uci set passwall2.$node_id.transport='grpc'
+      ;;
+  esac
+
+  # Security (Reality)
+  if [ "$security" = "reality" ]; then
+    uci set passwall2.$node_id.reality='1'
+    [ -n "$pbk" ] && uci set passwall2.$node_id.reality_publicKey="$pbk"
+    [ -n "$sid" ] && uci set passwall2.$node_id.reality_shortId="$sid"
+    [ -n "$sni" ] && uci set passwall2.$node_id.tls_serverName="$sni"
+    uci set passwall2.$node_id.utls='1'
+    [ -n "$fp" ] && uci set passwall2.$node_id.fingerprint="$fp"
+  fi
+
+  # Flow (for XTLS Vision)
+  [ -n "$flow" ] && uci set passwall2.$node_id.flow="$flow"
+
+  echo "  $NODE_COUNT) $remarks  [$address:$port]"
+done
+
+# Re-read nodes since the while loop ran in a subshell
+uci commit passwall2
+
+# Collect node IDs for selection
+NODE_IDS=""
+NODE_COUNT=0
+
+for line in $(uci show passwall2 | grep "\.protocol='vless'" ); do
+  node_id=$(echo "$line" | cut -d. -f2)
+  remarks=$(uci get passwall2.$node_id.remarks 2>/dev/null)
+  addr=$(uci get passwall2.$node_id.address 2>/dev/null)
+
+  case "$remarks" in
+    Example|example|rulenode|auto-shunt) continue ;;
+  esac
+  [ -z "$addr" ] && continue
+
+  NODE_COUNT=$((NODE_COUNT + 1))
+  NODE_IDS="$NODE_IDS $node_id"
+done
+
+if [ "$NODE_COUNT" -eq 0 ]; then
+  echo ""
+  echo "ERROR: No nodes found. Check your subscription URL."
+  echo "You can configure manually in LuCI: Services -> PassWall2"
+  exit 1
+fi
+
+echo ""
+printf "Select node for proxying blocked sites (1-$NODE_COUNT): "
+read NODE_CHOICE
+
+if ! echo "$NODE_CHOICE" | grep -qE '^[0-9]+$' || [ "$NODE_CHOICE" -lt 1 ] || [ "$NODE_CHOICE" -gt "$NODE_COUNT" ]; then
+  echo "Invalid choice. Defaulting to 1."
+  NODE_CHOICE=1
+fi
+
+SELECTED_NODE=$(echo $NODE_IDS | awk "{print \$$NODE_CHOICE}")
+SELECTED_NAME=$(uci get passwall2.$SELECTED_NODE.remarks 2>/dev/null)
+
+echo ""
+echo "  Selected: $SELECTED_NAME"
+echo "[5/8] Done."
+
+# --- Step 6: Set up subscription for auto-updates ---
+echo "[6/8] Setting up subscription auto-update..."
 
 while uci delete passwall2.@subscribe_list[0] 2>/dev/null; do :; done
 
@@ -507,89 +662,6 @@ uci set passwall2.@subscribe_list[0].week_update='8'
 uci set passwall2.@subscribe_list[0].interval_update='12'
 
 uci commit passwall2
-echo "[5/8] Done."
-
-# --- Step 6: Fetch nodes and let user choose ---
-echo "[6/8] Fetching nodes from subscription..."
-
-# IMPORTANT: Enable passwall2 but WITHOUT dns_redirect and WITHOUT a tcp_node.
-# This lets passwall2 run (and fetch subscriptions) without hijacking DNS.
-/etc/init.d/passwall2 stop 2>/dev/null || true
-sleep 2
-
-uci set passwall2.@global[0].enabled='1'
-uci set passwall2.@global[0].dns_redirect='0'
-uci delete passwall2.@global[0].tcp_node 2>/dev/null || true
-uci delete passwall2.@global[0].node 2>/dev/null || true
-uci commit passwall2
-
-/etc/init.d/passwall2 start
-
-echo "  Waiting for subscription update..."
-sleep 15
-
-# If no nodes yet, try longer wait
-NODE_CHECK=$(uci show passwall2 | grep "\.protocol='vless'" | head -1)
-if [ -z "$NODE_CHECK" ]; then
-  echo "  Still waiting..."
-  sleep 15
-fi
-
-# Last resort: if still no nodes, try triggering lua directly
-NODE_CHECK=$(uci show passwall2 | grep "\.protocol='vless'" | head -1)
-if [ -z "$NODE_CHECK" ]; then
-  echo "  Trying direct subscription fetch..."
-  /etc/init.d/passwall2 stop 2>/dev/null || true
-  lua /usr/share/passwall2/subscribe.lua 2>/dev/null || true
-  sleep 5
-fi
-
-# Collect proxy nodes (skip shunt, socks, example nodes)
-NODE_IDS=""
-NODE_COUNT=0
-
-for line in $(uci show passwall2 | grep "\.protocol=" | grep -v "_shunt" | grep -v "socks"); do
-  node_id=$(echo "$line" | cut -d. -f2)
-  proto=$(echo "$line" | cut -d\' -f2)
-  remarks=$(uci get passwall2.$node_id.remarks 2>/dev/null)
-
-  # Skip example/placeholder nodes
-  case "$remarks" in
-    Example|example|rulenode|auto-shunt) continue ;;
-  esac
-
-  # Skip nodes without an address
-  addr=$(uci get passwall2.$node_id.address 2>/dev/null)
-  [ -z "$addr" ] && continue
-
-  NODE_COUNT=$((NODE_COUNT + 1))
-  NODE_IDS="$NODE_IDS $node_id"
-  echo "  $NODE_COUNT) $remarks  [$proto, $addr]"
-done
-
-if [ "$NODE_COUNT" -eq 0 ]; then
-  echo ""
-  echo "ERROR: No nodes found. Check your subscription URL."
-  echo "You can configure manually in LuCI: Services -> PassWall2"
-  exit 1
-fi
-
-echo ""
-printf "Select node for proxying blocked sites (1-$NODE_COUNT): "
-read NODE_CHOICE
-
-# Validate input
-if ! echo "$NODE_CHOICE" | grep -qE '^[0-9]+$' || [ "$NODE_CHOICE" -lt 1 ] || [ "$NODE_CHOICE" -gt "$NODE_COUNT" ]; then
-  echo "Invalid choice. Defaulting to 1."
-  NODE_CHOICE=1
-fi
-
-# Get selected node ID
-SELECTED_NODE=$(echo $NODE_IDS | awk "{print \$$NODE_CHOICE}")
-SELECTED_NAME=$(uci get passwall2.$SELECTED_NODE.remarks 2>/dev/null)
-
-echo ""
-echo "  Selected: $SELECTED_NAME"
 echo "[6/8] Done."
 
 # --- Step 7: Create shunt and enable ---
