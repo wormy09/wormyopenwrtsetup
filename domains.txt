@@ -47,6 +47,8 @@ domain:gstatic.com
 domain:gvt1.com
 domain:1e100.net
 domain:play.google.com
+domain:googleapis.com
+domain:withgoogle.com
 
 # --- Discord ---
 domain:discord.com

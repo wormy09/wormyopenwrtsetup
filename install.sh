@@ -166,6 +166,8 @@ domain:gstatic.com
 domain:gvt1.com
 domain:1e100.net
 domain:play.google.com
+domain:googleapis.com
+domain:withgoogle.com
 domain:discord.com
 domain:discord.gg
 domain:discord.app
@@ -446,7 +448,18 @@ IP_LIST='149.154.160.0/20
 31.13.64.0/18
 102.132.96.0/20
 129.134.0.0/16
-185.60.216.0/22'
+185.60.216.0/22
+142.250.0.0/15
+172.217.0.0/16
+216.58.192.0/19
+142.251.0.0/16
+172.253.0.0/16
+74.125.0.0/16
+64.233.160.0/19
+108.177.0.0/17
+173.194.0.0/16
+209.85.128.0/17
+192.178.0.0/15'
 
 # Apply shunt rules
 uci set passwall2.Russia_Block=shunt_rules

@@ -82,6 +82,11 @@ rm -rf /tmp/bak_v2ray
 
 **This script uses manual domain lists — the only stable approach for 256MB routers.**
 
+## Known limitations
+
+- **Telegram media on iPhone** — text messages work, but photos/videos don't download. This is an iOS TPROXY limitation. Android and web Telegram work fine. Workaround: use VPN app on iPhone for Telegram media, or use Telegram web version.
+- **xray memory leak** — xray gradually consumes more memory. The 6-hour cron restart prevents OOM crashes on 256MB routers. Not an issue on 512MB+ routers.
+
 ## License
 
 MIT
