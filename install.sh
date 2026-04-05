@@ -433,7 +433,8 @@ domain:see24.eu
 domain:9gag.com
 domain:9cache.com
 domain:pornolab.net
-domain:rutracker.org'
+domain:rutracker.org
+domain:anydesk.com'
 
 IP_LIST='149.154.160.0/20
 91.108.4.0/22
@@ -459,7 +460,11 @@ IP_LIST='149.154.160.0/20
 108.177.0.0/17
 173.194.0.0/16
 209.85.128.0/17
-192.178.0.0/15'
+192.178.0.0/15
+62.96.74.120/29
+213.61.91.48/29
+217.110.18.136/29
+217.110.194.192/29'
 
 # Apply shunt rules
 uci set passwall2.Russia_Block=shunt_rules
@@ -726,7 +731,9 @@ rm -rf /tmp/bak_v2ray
 rm -f /usr/share/xray/geosite.dat /usr/share/xray/geoip.dat
 rm -f /usr/share/v2ray/geosite.dat /usr/share/v2ray/geoip.dat
 
-echo '0 */6 * * * rm -rf /tmp/bak_v2ray 2>/dev/null; /etc/init.d/passwall2 restart' > /etc/crontabs/root
+mkdir -p /etc/cron.d
+echo '0 */6 * * * root rm -rf /tmp/bak_v2ray 2>/dev/null; /etc/init.d/passwall2 restart' > /etc/cron.d/passwall2_restart
+chmod 644 /etc/cron.d/passwall2_restart
 /etc/init.d/cron restart
 
 /etc/init.d/passwall2 restart
