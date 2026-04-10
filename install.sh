@@ -81,6 +81,13 @@ echo "[2/8] Done."
 # --- Step 3: Install Passwall2 ---
 echo "[3/8] Installing Passwall2..."
 
+# Skip if already installed
+if [ "$PKG_MGR" = "apk" ] && apk list --installed 2>/dev/null | grep -q "luci-app-passwall2"; then
+  echo "  Passwall2 already installed, skipping."
+elif [ "$PKG_MGR" = "opkg" ] && opkg list-installed 2>/dev/null | grep -q "luci-app-passwall2"; then
+  echo "  Passwall2 already installed, skipping."
+else
+
 read release arch << EOF
 $(. /etc/openwrt_release ; echo ${DISTRIB_RELEASE%.*} $DISTRIB_ARCH)
 EOF
@@ -117,6 +124,7 @@ else
   opkg install dnsmasq-full 2>/dev/null || true
   opkg install kmod-nft-socket kmod-nft-tproxy kmod-nft-nat 2>/dev/null || true
   opkg install luci-app-passwall2
+fi
 fi
 
 echo "[3/8] Done."
