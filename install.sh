@@ -213,6 +213,7 @@ domain:7tv.io
 domain:betterttv.net
 domain:frankerfacez.com
 domain:claude.ai
+domain:claude.com
 domain:anthropic.com
 domain:claudeusercontent.com
 domain:github.com
@@ -224,9 +225,14 @@ domain:ip-tv.dev
 domain:iptv.pm
 domain:see24.eu
 domain:9gag.com
-domain:pornolab.net
+domain:9cache.com
 domain:rutracker.org
-domain:anydesk.com'
+domain:anydesk.com
+domain:sceneryaddons.org
+domain:flightsim.to
+domain:rosscarlson.dev
+domain:vatsim.net
+domain:vatsim.dev'
 
 IP_LIST='149.154.160.0/20
 91.108.4.0/22
@@ -255,7 +261,14 @@ IP_LIST='149.154.160.0/20
 62.96.74.120/29
 213.61.91.48/29
 217.110.18.136/29
-217.110.194.192/29'
+217.110.194.192/29
+8.6.112.0/24
+8.47.69.0/24
+51.81.107.59/32
+137.184.227.225/32
+164.92.240.76/32
+167.99.248.14/32
+192.95.16.233/32'
 
 # Apply shunt rules
 uci set passwall2.Russia_Block=shunt_rules

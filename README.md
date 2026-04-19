@@ -13,7 +13,7 @@ One-command Passwall2 setup for OpenWrt routers in Russia. Optimized for routers
 
 ## Proxied services
 
-YouTube, Discord, Instagram, Facebook, Meta/Oculus Quest, WhatsApp, Telegram, Twitter/X, TikTok, Cloudflare CDN, GitHub, Claude/Anthropic, 9GAG, IPTV (tvizi), rutracker, and more.
+YouTube, Discord, Instagram, Facebook, Meta/Oculus Quest, WhatsApp, Telegram, Twitter/X, TikTok, Cloudflare CDN, GitHub, Claude/Anthropic, AnyDesk, VATSIM/vPilot, 9GAG, IPTV (tvizi), rutracker, and more.
 
 ## Quick install
 

@@ -63,7 +63,7 @@ domain:whatsapp.com
 domain:whatsapp.net
 domain:wa.me
 
-# --- Telegram (domain:telegram.org covers ALL subdomains including cdn, api, web) ---
+# --- Telegram ---
 domain:telegram.org
 domain:t.me
 domain:telegram.me
@@ -106,6 +106,7 @@ domain:frankerfacez.com
 
 # --- Claude / Anthropic ---
 domain:claude.ai
+domain:claude.com
 domain:anthropic.com
 domain:claudeusercontent.com
 
@@ -121,8 +122,15 @@ domain:ip-tv.dev
 domain:iptv.pm
 domain:see24.eu
 
+# --- Flight Sim ---
+domain:sceneryaddons.org
+domain:flightsim.to
+domain:rosscarlson.dev
+domain:vatsim.net
+domain:vatsim.dev
+
 # --- Other ---
 domain:9gag.com
-domain:pornolab.net
+domain:9cache.com
 domain:rutracker.org
 domain:anydesk.com
