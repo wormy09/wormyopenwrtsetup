@@ -268,7 +268,12 @@ IP_LIST='149.154.160.0/20
 137.184.227.225/32
 164.92.240.76/32
 167.99.248.14/32
-192.95.16.233/32'
+192.95.16.233/32
+46.101.112.122/32
+178.128.193.227/32
+165.227.98.205/32
+129.212.184.20/32
+104.29.0.0/16'
 
 # Apply shunt rules
 uci set passwall2.Russia_Block=shunt_rules
@@ -516,6 +521,7 @@ uci set passwall2.myshunt.Russia_Block="$SELECTED_NODE"
 uci set passwall2.myshunt.default_node='_direct'
 
 uci set passwall2.@global[0].tcp_node='myshunt'
+uci set passwall2.@global[0].udp_node='myshunt'
 uci set passwall2.@global[0].node='myshunt'
 
 # Re-enable passwall2 and DNS redirect (was disabled for subscription fetch)
